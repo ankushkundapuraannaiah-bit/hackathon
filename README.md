@@ -1,4 +1,4 @@
-﻿# GeoManganese AI: Subterranean Mineral Detection Using Space Technology & ML
+# GeoManganese AI: Subterranean Mineral Detection Using Space Technology & ML
 
 **Problem Statement ID:** SIH26009  
 **Title:** Using AI/ML and Space Technology to Identify Manganese Reserves and Overcome Production Shortfalls  
@@ -32,6 +32,56 @@ The project follows a decoupled, file-based pipeline where each module operates 
 | **Role 4** | `4_train_model.py` | Random Forest prospectivity model & grid probability scoring | `outputs/3_training_data.csv`, `outputs/2_filtered_features.npy` | `outputs/4_trained_model.pkl`, `outputs/4_probability_grid.npy` |
 | **Role 6** | `5_generate_heatmap.py` | Yellow-to-red colormapping & alpha transparency overlay | `outputs/4_probability_grid.npy` | `outputs/heatmap_overlay.png` |
 | **Role 5** | `app.py` | Streamlit + Folium Interactive Web GIS Exploration Dashboard | `outputs/heatmap_overlay.png`, `outputs/crop_metadata.json` | **Live Web GIS App** |
+
+---
+
+## 📦 Prerequisites & Local Installation
+
+### 1. Prerequisites
+- **Python:** 3.10 or higher installed
+- **Git:** Installed and configured
+
+### 2. Clone the Repository
+```bash
+git clone https://github.com/ankushkundapuraannaiah-bit/hackathon.git
+cd hackathon
+```
+
+### 3. Create & Activate Virtual Environment (Recommended)
+```bash
+# Windows (PowerShell)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# Windows (Command Prompt)
+python -m venv venv
+.\venv\Scripts\activate.bat
+
+# Linux / macOS
+python -m venv venv
+source venv/bin/activate
+```
+
+### 4. Install Required Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+#### Core Packages Breakdown:
+| Package | Version | Purpose |
+| :--- | :--- | :--- |
+| `streamlit` | `>=1.30.0` | Interactive Web GIS Dashboard user interface |
+| `streamlit-folium` | `>=0.18.0` | Streamlit component for bidirectional Folium maps |
+| `folium` | `>=0.15.0` | Leaflet map generation, satellite tile layers, and geo overlays |
+| `numpy` | `>=1.24.0` | Satellite spectral array operations and grid calculations |
+| `pandas` | `>=2.0.0` | Feature table generation and mine coordinate processing |
+| `scikit-learn` | `>=1.3.0` | Random Forest classifier and model evaluation metrics |
+| `joblib` | `>=1.3.0` | Serializing and loading the trained ML model (`.pkl`) |
+| `matplotlib` | `>=3.7.0` | Colormap normalization for prospectivity heatmaps |
+| `pillow` | `>=10.0.0` | RGBA heatmap image processing and PNG export |
+| `tifffile` | `>=2023.7.10`| GeoTIFF raster band extraction and metadata parsing |
+| `openpyxl` | `>=3.1.0` | Excel spreadsheet ground truth coordinates parser |
+| `requests` | `>=2.31.0` | Concurrent chunked satellite imagery downloader |
 
 ---
 
