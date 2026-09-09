@@ -1,0 +1,30 @@
+Name,Latitude,Longitude,Label,Category,Red,NIR,SWIR1,SWIR2,NDVI,SWIR_Alteration,Ferrous_Mn_Index,Is_Bare_Ground,Inside_Crop
+MOIL Bharweli Balaghat Mine,21.8988,80.2078,1,Active Manganese Mine,0.1078,0.3044,0.3081,0.1962,0.4769,1.5702,1.0124,0,1
+Bharweli North Extension Horizon,21.915,80.215,1,Manganese Prospect,0.0346,0.2686,0.1469,0.0683,0.7719,2.1517,0.5468,0,1
+Hirapur Manganese Occurrence,21.875,80.125,1,Manganese Float Ore,0.1102,0.2547,0.2853,0.2172,0.3961,1.3135,1.1199,1,1
+Sausar Manganiferous Ridge,21.882,80.195,1,Gondite Manganese Horizon,0.1195,0.2533,0.27,0.1871,0.3588,1.4433,1.0661,1,1
+MOIL Ramrama Mine,21.85,79.9167,1,Open Cast Manganese Mine,0.0362,0.2519,0.1564,0.0733,0.7487,2.1334,0.6207,0,0
+MOIL Miragpur Deposit,21.78,79.88,1,Manganese Prospect,0.1045,0.2523,0.2936,0.2055,0.4145,1.4285,1.1635,0,0
+MOIL Ukwa Mine,21.9667,80.4667,1,Underground Manganese Mine,0.0941,0.2115,0.1767,0.1337,0.3841,1.321,0.8353,1,0
+Balaghat Urban Settlement,21.8047,80.1849,0,Urban Core,0.0755,0.281,0.2051,0.1232,0.5765,1.6641,0.7299,0,1
+Wainganga River Basin,21.82,80.165,0,Water Body / River Alluvium,0.0384,0.2421,0.1344,0.0602,0.7262,2.2313,0.5552,0,1
+Lalbarra Cropland,21.93,80.05,0,Agricultural Plain,0.1091,0.2851,0.2971,0.1868,0.4466,1.5909,1.042,0,0
+Waraseoni Farmland,21.75,80.05,0,Agriculture,0.0989,0.283,0.2413,0.1457,0.4822,1.6559,0.8528,0,0
+Kanha Buffer Forest Reserve,22.05,80.35,0,Dense Forest Canopy,0.0317,0.2338,0.1439,0.0713,0.7611,2.0184,0.6157,0,0
+Dhuti Reservoir Open Water,21.92,80.19,0,Open Water Reservoir,0.1136,0.2801,0.3279,0.2386,0.4231,1.3741,1.1706,0,1
+Gangulpara Forest Zone,21.86,80.26,0,Forest Cover,0.0887,0.2358,0.207,0.1259,0.453,1.6435,0.8779,0,1
+Kirnapur Plain,21.65,80.3,0,Agricultural Land,0.1049,0.2552,0.2682,0.1848,0.4172,1.4514,1.051,0,0
+Baihar Plateau Laterite,22.1,80.55,0,Lateritic Grassland,0.1119,0.2247,0.2434,0.2018,0.3351,1.2059,1.083,1,0
+Lamta Rural Plain,22.12,80.22,0,Fallow Land,0.0276,0.2577,0.1379,0.0608,0.8064,2.2696,0.5352,0,0
+Balaghat Infrastructure Depot,21.815,80.192,0,Industrial Infrastructure,0.1232,0.2069,0.2506,0.2121,0.2535,1.1817,1.211,1,1
+Bharweli Open Pit Working 1,21.9015,80.2092,1,Manganese Open Pit,0.0835,0.2651,0.2091,0.1244,0.5209,1.6811,0.789,0,1
+Bharweli Tailings & Ore Stacks,21.895,80.205,1,Manganese Ore Stockpile,0.0762,0.2607,0.2042,0.1244,0.5474,1.6417,0.7833,0,1
+Bharweli North Gondite Outcrop,21.912,80.218,1,Manganese Outcrop,0.0403,0.2515,0.1504,0.0715,0.7237,2.1053,0.5981,0,1
+Manegaon Manganese Prospect,21.885,80.225,1,Manganese Prospect,0.0301,0.2595,0.1271,0.0552,0.7918,2.3006,0.4896,0,1
+Laugur-Ukwa Manganese Trend,21.928,80.245,1,Manganiferous Schist,0.0258,0.2205,0.1226,0.0551,0.7907,2.2243,0.5559,0,1
+Balaghat District Hospital Area,21.812,80.181,0,Urban Residential,0.0732,0.2343,0.1664,0.1083,0.5239,1.5364,0.7101,0,1
+Garra Wainganga River Sand,21.835,80.155,0,River Sand / Water,0.1113,0.2564,0.2616,0.2049,0.3948,1.2765,1.0199,1,1
+Waraseoni Road Agricultural Field,21.825,80.12,0,Active Agriculture,0.0841,0.2535,0.236,0.151,0.5019,1.5624,0.931,0,1
+Hatta Agricultural Plain,21.785,80.23,0,Paddy Cultivation,0.0685,0.2472,0.1939,0.1145,0.566,1.6934,0.7844,0,1
+Gangulpara Forest Reserve,21.87,80.26,0,Sal Forest Canopy,0.0986,0.2249,0.1948,0.1276,0.3906,1.5263,0.866,1,1
+Sarandi Water Reservoir,21.792,80.145,0,Inland Water,0.0495,0.3165,0.178,0.0938,0.7296,1.8976,0.5624,0,1

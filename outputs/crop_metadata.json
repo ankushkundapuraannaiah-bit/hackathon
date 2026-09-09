@@ -1,0 +1,38 @@
+{
+  "dataset": "Landsat-9 OLI-2 / Sentinel-2 Equivalent Surface Reflectance",
+  "region": "Balaghat & Bharweli Manganese Mining Belt, MP, India",
+  "shape": [
+    600,
+    600
+  ],
+  "bands": [
+    "B4_Red",
+    "B8_NIR",
+    "B11_SWIR1",
+    "B12_SWIR2"
+  ],
+  "scene_pixel_offsets": {
+    "r_start": 2902,
+    "r_end": 3502,
+    "c_start": 1502,
+    "c_end": 2102
+  },
+  "utm_bounds": {
+    "left": 406260.0,
+    "right": 424260.0,
+    "bottom": 2407440.0,
+    "top": 2425440.0
+  },
+  "wgs84_bounds": {
+    "min_lat": 21.76901414893615,
+    "max_lat": 21.930756132803804,
+    "min_lon": 80.09231766315732,
+    "max_lon": 80.26742848466002
+  },
+  "center_coords": {
+    "lat": 21.84988514086998,
+    "lon": 80.17987307390867
+  },
+  "pixel_size_m": 30.0,
+  "crs": "WGS 84 / UTM zone 44N (EPSG:32644)"
+}
