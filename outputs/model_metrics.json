@@ -1,25 +1,11 @@
 {
-  "model_type": "RandomForestClassifier",
-  "n_estimators": 150,
-  "max_depth": 5,
-  "cv_accuracy_mean": 0.30666666666666664,
-  "cv_accuracy_std": 0.15832456116050556,
-  "cv_roc_auc_mean": 0.18611111111111112,
-  "cv_roc_auc_std": 0.23498095536174002,
-  "training_accuracy": 1.0,
-  "training_roc_auc": 1.0,
-  "feature_importances": {
-    "NIR": 0.16938641186404568,
-    "SWIR_Alteration": 0.1605552814798082,
-    "SWIR1": 0.14935947898046298,
-    "Red": 0.14558897363089543,
-    "NDVI": 0.12922399577448085,
-    "SWIR2": 0.1280486975257107,
-    "Ferrous_Mn_Index": 0.11783716074459635
-  },
+  "dataset_name": "Balaghat & Bharweli Central Belt",
   "target_area_km2": 324.0,
-  "high_confidence_area_km2": 1.764,
-  "high_confidence_pixel_count": 1960,
+  "high_confidence_area_km2": 0.9612,
+  "high_confidence_pixel_count": 1068,
   "peak_probability": 0.8511906862258911,
-  "mean_probability": 0.13331517577171326
+  "mean_probability": 0.13562417030334473,
+  "manganese_reservoirs_detected": 43,
+  "total_reservoir_hectares": 21.42,
+  "confidence_threshold_used": 0.65
 }
