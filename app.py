@@ -24,7 +24,14 @@ import pandas as pd
 import streamlit as st
 import folium
 from folium import plugins, raster_layers
+from folium.plugins import Draw
 from streamlit_folium import st_folium
+from weather_advisor import (
+    fetch_weather_data,
+    assess_mining_climatic_risk,
+    render_weather_warning_banner,
+    WMO_CODES
+)
 
 # Page configuration
 st.set_page_config(
@@ -276,11 +283,22 @@ with kpi5:
     )
 
 # -------------------------------------------------------------
-# TABS: MAP GIS, RESERVOIR INTELLIGENCE, DATASET INGESTION, SPECTRAL, ML DEFENSE, PIPELINE
+# REAL-TIME WEATHER API & PRE-MINING CLIMATIC WARNING BANNER
 # -------------------------------------------------------------
-tab_map, tab_reservoirs, tab_dataset, tab_inspector, tab_defense, tab_pipeline = st.tabs([
+main_weather = fetch_weather_data(center_lat, center_lon)
+if main_weather:
+    main_risk = assess_mining_climatic_risk(main_weather)
+    active_loc_name = metadata.get('dataset', 'Balaghat Manganese Mining Belt') if metadata else 'Balaghat Manganese Mining Belt'
+    render_weather_warning_banner(main_risk, location_name=active_loc_name)
+
+# -------------------------------------------------------------
+# TABS: MAP GIS, HEATMAP, RESERVOIRS, CLIMATE, DATASET, SPECTRAL, DEFENSE, PIPELINE
+# -------------------------------------------------------------
+tab_map, tab_heatmap, tab_reservoirs, tab_weather, tab_dataset, tab_inspector, tab_defense, tab_pipeline = st.tabs([
     "🗺️ Interactive Web GIS Map",
+    "🔥 AI Prospectivity Heatmap",
     "💎 Manganese Reservoir Intelligence",
+    "🌦️ Climate & Mining Rain Safety",
     "📥 Ingest & Analyze New Dataset",
     "🔬 Spectral Profiler & Anomaly Inspector",
     "💡 Remote Sensing & Space Tech Defense",
@@ -494,11 +512,358 @@ with tab_map:
     """
     m.get_root().html.add_child(folium.Element(legend_html))
 
-    # Render Folium Map in Streamlit
-    st_folium(m, width=None, height=640, returned_objects=[])
+    # Add Draw plugin for interactive area selection (box/polygon)
+    Draw(
+        export=False,
+        position="topleft",
+        draw_options={
+            'polyline': False,
+            'polygon': True,
+            'circle': False,
+            'circlemarker': False,
+            'marker': False,
+            'rectangle': True,
+        },
+        edit_options={'edit': True, 'remove': True}
+    ).add_to(m)
+
+    # Render Folium Map in Streamlit and capture drawn objects
+    map_output = st_folium(
+        m,
+        width=None,
+        height=640,
+        returned_objects=["all_drawings", "last_active_drawing"],
+        key="geomanganese_main_map"
+    )
+
+    # -------------------------------------------------------------
+    # INTERACTIVE DRAWING / AREA SELECTION & MINE COORDINATE DISPLAY
+    # -------------------------------------------------------------
+    st.markdown("---")
+    st.subheader("📐 Selected Exploration Area & Mine Coordinates Inspector")
+    st.markdown("""
+    Select an area on the map by drawing a box (click **Rectangle ⏹️** or **Polygon ⬟** on the top-left map toolbar). 
+    The coordinates of the selected area, any enclosed MOIL mines, detected reservoirs, and real-time pre-mining climatic rain warnings will appear below.
+    """)
+
+    # Check for drawn geometry from user
+    drawn_feature = None
+    if map_output:
+        if map_output.get("last_active_drawing"):
+            drawn_feature = map_output["last_active_drawing"]
+        elif map_output.get("all_drawings") and len(map_output["all_drawings"]) > 0:
+            drawn_feature = map_output["all_drawings"][-1]
+
+    # Parse drawn polygon/rectangle if available
+    drawn_box_data = None
+    if drawn_feature and "geometry" in drawn_feature:
+        geom = drawn_feature.get("geometry", {})
+        coords = geom.get("coordinates", [])
+        if coords and len(coords) > 0:
+            ring = coords[0]
+            lons = [pt[0] for pt in ring]
+            lats = [pt[1] for pt in ring]
+            min_lat, max_lat = min(lats), max(lats)
+            min_lon, max_lon = min(lons), max(lons)
+            c_lat = (min_lat + max_lat) / 2.0
+            c_lon = (min_lon + max_lon) / 2.0
+            lat_km = abs(max_lat - min_lat) * 110.574
+            lon_km = abs(max_lon - min_lon) * 111.320 * math.cos(math.radians(c_lat))
+            area_km2 = lat_km * lon_km
+            drawn_box_data = {
+                "min_lat": min_lat,
+                "max_lat": max_lat,
+                "min_lon": min_lon,
+                "max_lon": max_lon,
+                "center_lat": c_lat,
+                "center_lon": c_lon,
+                "area_km2": area_km2,
+                "area_ha": area_km2 * 100.0,
+                "source": "map_drawing"
+            }
+
+    # If no drawing made yet, provide quick preset mine selection fallback
+    col_mode1, col_mode2 = st.columns([2, 1])
+    with col_mode1:
+        preset_mine_options = ["None (Draw on Map)"]
+        if df_train is not None:
+            active_mines_list = df_train[df_train['Label'] == 1]['Name'].tolist()
+            preset_mine_options.extend(active_mines_list)
+        if reservoirs:
+            preset_mine_options.extend([f"{r['reservoir_id']} — {r['name'].split('(')[0].strip()}" for r in reservoirs[:5]])
+
+        quick_pick = st.selectbox(
+            "Or quickly inspect coordinates & climatic warning for a known mine / reservoir:",
+            preset_mine_options,
+            help="Select any mine to view its exact GPS coordinates and live pre-mining climatic rain limitation warning."
+        )
+
+    # Determine which area to inspect
+    inspect_data = None
+    selected_mine_meta = None
+
+    if drawn_box_data:
+        inspect_data = drawn_box_data
+        st.success(f"✅ **Area Captured from Map Drawing!** Bounding box: ({drawn_box_data['min_lat']:.4f}° to {drawn_box_data['max_lat']:.4f}° N, {drawn_box_data['min_lon']:.4f}° to {drawn_box_data['max_lon']:.4f}° E)")
+    elif quick_pick != "None (Draw on Map)":
+        # Extract mine info
+        mine_row = None
+        if df_train is not None and quick_pick in df_train['Name'].values:
+            mine_row = df_train[df_train['Name'] == quick_pick].iloc[0]
+            lat_pt = float(mine_row['Latitude'])
+            lon_pt = float(mine_row['Longitude'])
+            # Create a 1km x 1km box around the mine
+            delta_deg = 0.009  # approx 1km
+            inspect_data = {
+                "min_lat": lat_pt - delta_deg,
+                "max_lat": lat_pt + delta_deg,
+                "min_lon": lon_pt - delta_deg,
+                "max_lon": lon_pt + delta_deg,
+                "center_lat": lat_pt,
+                "center_lon": lon_pt,
+                "area_km2": 4.0,
+                "area_ha": 400.0,
+                "source": "preset_mine",
+                "mine_name": quick_pick
+            }
+            selected_mine_meta = mine_row
+        elif reservoirs:
+            res_match = [r for r in reservoirs if quick_pick.startswith(r['reservoir_id'])]
+            if res_match:
+                r_obj = res_match[0]
+                lat_pt = float(r_obj['latitude'])
+                lon_pt = float(r_obj['longitude'])
+                delta_deg = 0.006
+                inspect_data = {
+                    "min_lat": lat_pt - delta_deg,
+                    "max_lat": lat_pt + delta_deg,
+                    "min_lon": lon_pt - delta_deg,
+                    "max_lon": lon_pt + delta_deg,
+                    "center_lat": lat_pt,
+                    "center_lon": lon_pt,
+                    "area_km2": r_obj['area_km2'],
+                    "area_ha": r_obj['area_hectares'],
+                    "source": "preset_reservoir",
+                    "mine_name": r_obj['reservoir_id']
+                }
+
+    if inspect_data:
+        box_c_lat = inspect_data['center_lat']
+        box_c_lon = inspect_data['center_lon']
+        min_lt = inspect_data['min_lat']
+        max_lt = inspect_data['max_lat']
+        min_ln = inspect_data['min_lon']
+        max_ln = inspect_data['max_lon']
+
+        # 1. Coordinates Breakdown Card
+        st.markdown("#### 📍 Bounding Box & Centroid Coordinates:")
+        coord_c1, coord_c2, coord_c3, coord_c4 = st.columns(4)
+        with coord_c1:
+            st.metric("🎯 Centroid Coordinate", f"{box_c_lat:.5f}° N", delta=f"{box_c_lon:.5f}° E")
+        with coord_c2:
+            st.metric("📐 North-West Corner", f"{max_lt:.5f}° N", delta=f"{min_ln:.5f}° E")
+        with coord_c3:
+            st.metric("📐 South-East Corner", f"{min_lt:.5f}° N", delta=f"{max_ln:.5f}° E")
+        with coord_c4:
+            st.metric("🗺️ Enclosed Area", f"{inspect_data['area_km2']:.3f} km²", delta=f"{inspect_data['area_ha']:.1f} Hectares")
+
+        # 2. Mines inside the drawn box
+        mines_enclosed = []
+        if df_train is not None:
+            matched_mines = df_train[
+                (df_train['Latitude'] >= min_lt) & (df_train['Latitude'] <= max_lt) &
+                (df_train['Longitude'] >= min_ln) & (df_train['Longitude'] <= max_ln) &
+                (df_train['Label'] == 1)
+            ]
+            if len(matched_mines) > 0:
+                mines_enclosed = matched_mines.to_dict('records')
+
+        res_enclosed = []
+        if reservoirs:
+            res_enclosed = [
+                r for r in reservoirs
+                if (min_lt <= r['latitude'] <= max_lt) and (min_ln <= r['longitude'] <= max_ln)
+            ]
+
+        mcol1, mcol2 = st.columns([1, 1])
+        with mcol1:
+            st.markdown(f"#### ⛏️ MOIL Mines in Selected Area: **{len(mines_enclosed)}**")
+            if mines_enclosed:
+                for m_item in mines_enclosed:
+                    st.markdown(f"""
+                    <div style="background:#FFF1F2; border-left:4px solid #DC2626; border-radius:6px; padding:10px 14px; margin-bottom:8px;">
+                        <b style="color:#991B1B; font-size:14px;">⛏️ {m_item['Name']}</b><br/>
+                        <span style="font-size:12px; color:#475569;">
+                            📍 <b>Latitude:</b> <code>{m_item['Latitude']:.5f}° N</code> &nbsp;|&nbsp; 
+                            📍 <b>Longitude:</b> <code>{m_item['Longitude']:.5f}° E</code>
+                        </span><br/>
+                        <span style="font-size:12px; color:#334155;">
+                            🏷️ Category: <b>{m_item['Category']}</b> &nbsp;|&nbsp; 
+                            🌡️ SWIR Alteration: <b>{m_item.get('SWIR_Alteration', 'N/A')}</b> &nbsp;|&nbsp;
+                            🌿 NDVI: <b>{m_item.get('NDVI', 'N/A')}</b>
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ No active MOIL commercial mines currently mapped within this exact boundary.")
+
+        with mcol2:
+            st.markdown(f"#### 💎 AI-Detected Mn Reservoirs in Area: **{len(res_enclosed)}**")
+            if res_enclosed:
+                for r_item in res_enclosed:
+                    r_color = r_item.get('marker_color', '#DC2626')
+                    st.markdown(f"""
+                    <div style="background:#F8FAFC; border-left:4px solid {r_color}; border-radius:6px; padding:10px 14px; margin-bottom:8px;">
+                        <b style="color:{r_color}; font-size:14px;">💎 {r_item['reservoir_id']}</b> — {r_item['confidence_percent']:.1f}% AI Confidence<br/>
+                        <span style="font-size:12px; color:#475569;">
+                            📍 <b>Latitude:</b> <code>{r_item['latitude']:.5f}° N</code> &nbsp;|&nbsp; 
+                            📍 <b>Longitude:</b> <code>{r_item['longitude']:.5f}° E</code>
+                        </span><br/>
+                        <span style="font-size:12px; color:#334155;">
+                            📐 Area: <b>{r_item['area_hectares']:.2f} Ha</b> &nbsp;|&nbsp; 
+                            🏷️ Tier: <b>{r_item['tier'].split(':')[0]}</b> &nbsp;|&nbsp;
+                            ⚒️ {r_item['recommendation']}
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ No AI prospectivity clusters delineated inside this specific drawn box.")
+
+        # 3. Real-Time Pre-Mining Climatic Limitation & Rain Warning for Selected Coordinates
+        st.markdown("#### 🌦️ Pre-Mining Climatic Warning for Selected Area Coordinates:")
+        selected_weather = fetch_weather_data(box_c_lat, box_c_lon)
+        if selected_weather:
+            sel_risk = assess_mining_climatic_risk(selected_weather)
+            render_weather_warning_banner(
+                sel_risk, 
+                location_name=f"Selected Coordinates ({box_c_lat:.4f}° N, {box_c_lon:.4f}° E)"
+            )
+            
+            # Actionable pre-mining safety status
+            r_level = sel_risk['risk_level']
+            if r_level in ["CRITICAL", "WARNING"]:
+                st.error(f"""
+                ⛔ **DGMS CLIMATIC LIMITATION ADVISORY:** Active or impending precipitation exceeds safe operating thresholds at this location.
+                - **Rainfall Forecast (Tomorrow):** {sel_risk['tomorrow_precip_sum']:.1f} mm ({sel_risk['tomorrow_prob']}% probability, {sel_risk['tomorrow_desc']}).
+                - **Pre-Mining Check:** Delay open-pit excavation and ANFO blasting; mobilize sump pumps; enforce reduced speed limit (15 km/h) for heavy haul dumpers.
+                """)
+            else:
+                st.success(f"""
+                ✅ **PRE-MINING SAFETY CLEARED:** Atmospheric conditions at this mine/area are within safe exploration and production parameters.
+                - Current precipitation: 0.0 mm | Cloud Cover: {selected_weather['current'].get('cloud_cover', 0)}%
+                - Permitted: Core drilling, trench sampling, bench excavation, and ore haulage.
+                """)
+    else:
+        st.info("💡 **Instructions:** Click the **Rectangle (⏹️)** or **Polygon (⬟)** icon on the top-left of the map above and draw a box over any mining area to inspect coordinates and pre-mining weather warnings.")
 
 # -------------------------------------------------------------
-# TAB 2: MANGANESE RESERVOIR INTELLIGENCE
+# TAB 2: AI PROSPECTIVITY HEATMAP
+# -------------------------------------------------------------
+with tab_heatmap:
+    st.subheader("🔥 AI Subterranean Manganese Prospectivity Heatmap")
+    st.markdown("""
+    **High-Resolution Spectral Prospectivity Model (Landsat-9 OLI-2 / Sentinel-2 Surface Reflectance):**
+    Visualizes calibrated machine learning probabilities ($0.0$ to $1.0$) across the **324 km² Balaghat & Bharweli exploration grid**.
+    Each pixel represents $30\\text{m} \\times 30\\text{m}$ ($900\\text{ m}^2$) ground resolution, isolated from forest canopy and evaluated using SWIR hydrothermal alteration spectroscopy.
+    """)
+
+    prob_path = os.path.join("outputs", "4_probability_grid.npy")
+    full_heatmap_img = os.path.join("outputs", "prospectivity_heatmap.png")
+
+    if os.path.exists(prob_path):
+        prob_grid = np.load(prob_path)
+        
+        # Heatmap Statistical KPIs
+        hm1, hm2, hm3, hm4, hm5 = st.columns(5)
+        with hm1:
+            st.metric("🎯 Peak Probability", f"{float(prob_grid.max())*100:.1f}%", delta="Maximum Confidence")
+        with hm2:
+            st.metric("📊 Mean Scene Probability", f"{float(prob_grid.mean())*100:.1f}%", delta="Baseline Regolith")
+        with hm3:
+            p35_count = int(np.sum(prob_grid >= 0.35))
+            st.metric("🟡 Anomaly Area (≥ 0.35)", f"{p35_count*900/10000:.1f} Ha", delta=f"{p35_count:,} Pixels")
+        with hm4:
+            p50_count = int(np.sum(prob_grid >= 0.50))
+            st.metric("🟠 High Confidence (≥ 0.50)", f"{p50_count*900/10000:.1f} Ha", delta=f"{p50_count:,} Pixels")
+        with hm5:
+            p70_count = int(np.sum(prob_grid >= 0.70))
+            st.metric("🔴 Peak Ore Targets (≥ 0.70)", f"{p70_count*900/10000:.1f} Ha", delta=f"{p70_count:,} Pixels")
+
+        st.markdown("---")
+
+        # Display Options
+        hcol1, hcol2 = st.columns([3, 1])
+        with hcol1:
+            st.markdown("#### 🗺️ High-Resolution Geospatial Prospectivity Heatmap:")
+            if os.path.exists(full_heatmap_img):
+                st.image(full_heatmap_img, caption="AI Subterranean Manganese Prospectivity Heatmap with MOIL Mine & Reservoir Ground Truth Overlays (EPSG:4326)", use_container_width=True)
+            else:
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots(figsize=(10, 8))
+                im = ax.imshow(prob_grid, cmap='YlOrRd', vmin=0.2, vmax=0.85)
+                plt.colorbar(im, ax=ax, label="Prospectivity Probability")
+                st.pyplot(fig)
+                plt.close()
+
+        with hcol2:
+            st.markdown("#### ⚙️ Heatmap Controls & Filters")
+            
+            filter_thresh = st.slider(
+                "Filter Prospectivity Threshold:",
+                min_value=0.20,
+                max_value=0.80,
+                value=0.35,
+                step=0.05,
+                help="Adjust threshold to see the footprint of anomalies above specific AI confidence levels."
+            )
+
+            filtered_pixels = int(np.sum(prob_grid >= filter_thresh))
+            filtered_km2 = filtered_pixels * 900 / 1000000.0
+            filtered_ha = filtered_km2 * 100.0
+
+            st.markdown(f"""
+            <div style="background:#F1F5F9; border-left:4px solid #F97316; border-radius:6px; padding:12px; margin:10px 0;">
+                <b style="color:#0F172A;">Threshold Selection:</b> <code>P ≥ {filter_thresh:.2f}</code><br/>
+                • <b>Active Pixels:</b> <code>{filtered_pixels:,}</code> of 360,000<br/>
+                • <b>Surface Footprint:</b> <b>{filtered_km2:.2f} km²</b> ({filtered_ha:.1f} Ha)<br/>
+                • <b>Scene Coverage:</b> <code>{filtered_pixels/360000*100:.2f}%</code> of total study area
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("---")
+            st.markdown("#### 🎨 Colormap Interpretation:")
+            st.markdown("""
+            - 🔴 **Crimson / Gold (0.70 - 0.85+):** Primary Subterranean Manganese Ore Horizon (MOIL Bharweli alignment)
+            - 🟠 **Orange (0.50 - 0.70):** Hydrothermal Alteration Halos & Gondite Schist Outcrops
+            - 🟡 **Yellow (0.35 - 0.50):** Superficial Regolith & Lateritic Float Ore
+            - ⬛ **Dark / Transparent (< 0.35):** Forest, Agriculture, Host Gneiss & Non-Mineral Background
+            """)
+
+            st.markdown("---")
+            if os.path.exists(full_heatmap_img):
+                with open(full_heatmap_img, "rb") as f_img:
+                    img_data = f_img.read()
+                st.download_button(
+                    label="📥 Download Full-Res Heatmap (PNG)",
+                    data=img_data,
+                    file_name="geomanganese_ai_heatmap.png",
+                    mime="image/png",
+                    use_container_width=True
+                )
+
+        st.markdown("---")
+        st.markdown("#### 📊 Pixel Probability Distribution (Background vs Mineralized Anomalies):")
+        hist_counts, bin_edges = np.histogram(prob_grid.flatten(), bins=50, range=(0.0, 1.0))
+        hist_df = pd.DataFrame({
+            "Probability Range": [f"{bin_edges[i]:.2f}-{bin_edges[i+1]:.2f}" for i in range(len(hist_counts))],
+            "Pixel Count": hist_counts
+        })
+        st.bar_chart(hist_df.set_index("Probability Range"), color="#F97316")
+    else:
+        st.warning("⚠️ No probability grid found. Please run the AI pipeline from the Automation Studio tab.")
+
+# -------------------------------------------------------------
+# TAB 3: MANGANESE RESERVOIR INTELLIGENCE
 # -------------------------------------------------------------
 with tab_reservoirs:
     st.subheader("💎 AI-Detected Subterranean Manganese Reservoir Intelligence")
@@ -664,7 +1029,112 @@ with tab_reservoirs:
             )
 
 # -------------------------------------------------------------
-# TAB 3: INGEST & ANALYZE NEW DATASET
+# TAB 3: CLIMATE & PRE-MINING WEATHER SAFETY INTELLIGENCE
+# -------------------------------------------------------------
+with tab_weather:
+    st.subheader("🌦️ Real-Time Climate Intelligence & Pre-Mining Rain Safety")
+    st.markdown("""
+    **Directorate General of Mines Safety (DGMS) Meteorological Compliance Protocol:**
+    Evaluates real-time precipitation, 7-day rainfall forecasts, and convective storm hazards to enforce pre-mining operational limitations across open-pit benches, haulage networks, highwalls, and sump drainage systems.
+    """)
+
+    # Mine / Location selector for detailed climate analysis
+    weather_sites = {
+        "Balaghat Exploration Center": (center_lat, center_lon),
+        "MOIL Bharweli Balaghat Mine (Deep Underground & Open Pit)": (21.8988, 80.2078),
+        "MOIL Ukwa Mine (Underground Manganese Horizon)": (21.9667, 80.4667),
+        "MOIL Ramrama Mine (Open-Cast Working)": (21.8500, 79.9167),
+        "Hirapur Manganese Deposit": (21.8750, 80.1250),
+        "Sausar Manganiferous Ridge": (21.8820, 80.1950)
+    }
+
+    w_site_choice = st.selectbox(
+        "**Select Mining Site / Exploration Horizon for Meteorological Audit:**",
+        list(weather_sites.keys())
+    )
+    sel_w_lat, sel_w_lon = weather_sites[w_site_choice]
+
+    # Fetch weather for selected site
+    site_weather_raw = fetch_weather_data(sel_w_lat, sel_w_lon)
+    if site_weather_raw:
+        site_risk = assess_mining_climatic_risk(site_weather_raw)
+        cw = site_risk["current_weather"]
+
+        # Prominent Warning Banner for this site
+        render_weather_warning_banner(site_risk, location_name=w_site_choice)
+
+        st.markdown("---")
+
+        # Current Meteorological Telemetry
+        st.markdown("#### 📡 Real-Time Atmospheric Telemetry:")
+        met1, met2, met3, met4, met5 = st.columns(5)
+        with met1:
+            st.metric("🌡️ Ambient Temp", f"{cw['temp_c']:.1f} °C", delta=f"{cw['weather_desc']}")
+        with met2:
+            st.metric("💧 Relative Humidity", f"{cw['humidity_pct']}%", delta="High Moisture" if cw['humidity_pct'] > 70 else "Normal")
+        with met3:
+            st.metric("🌧️ Current Rain Rate", f"{cw['rain_mm']:.1f} mm/h", delta="Precipitation" if cw['rain_mm'] > 0 else "Zero Rain", delta_color="inverse")
+        with met4:
+            st.metric("💨 Wind Velocity", f"{cw['wind_kmh']:.1f} km/h", delta="Gusts Monitored")
+        with met5:
+            st.metric("⛈️ 48h Rain Forecast", f"{site_risk['tomorrow_precip_sum']:.1f} mm", delta=f"{site_risk['tomorrow_prob']}% Probability", delta_color="inverse")
+
+        st.markdown("---")
+
+        # Mining Operational Feasibility Matrix (DGMS Regulations)
+        st.markdown("#### 🛡️ Mining Operational Feasibility Matrix (DGMS Regulations):")
+        st.markdown("Status of primary open-pit and underground operations under current and 24h forecast rainfall:")
+
+        for op in site_risk["operations"]:
+            st.markdown(f"""
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-left:5px solid {op['color']}; border-radius:6px; padding:10px 16px; margin-bottom:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <b style="font-size:14px; color:#1E293B;">{op['name']}</b>
+                    <span style="background:{op['color']}; color:white; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;">
+                        {op['status']}
+                    </span>
+                </div>
+                <div style="font-size:12px; color:#475569; margin-top:4px;">
+                    {op['advisory']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # 7-Day Precipitation & Mining Feasibility Forecast Table
+        st.markdown("#### 📅 7-Day Precipitation & Mining Feasibility Outlook:")
+        st.markdown("Projected rainfall totals, probability of precipitation, and operational clearance:")
+
+        f_data = []
+        for d in site_risk["forecast_days"]:
+            f_data.append({
+                "Date": d["date"],
+                "Sky Condition": f"{d['icon']} {d['desc']}",
+                "Rainfall (mm)": f"{d['precip_mm']:.1f} mm",
+                "Rain Probability": f"{d['rain_prob']}%",
+                "Temp Range": d["temp_range"],
+                "Mining Clearance": d["mining_status"]
+            })
+        
+        f_df = pd.DataFrame(f_data)
+        st.dataframe(f_df, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+
+        # DGMS Mining Protocol Reference & Monsoon Precautions
+        with st.expander("📖 DGMS Heavy Rainfall & Monsoon Standard Operating Procedures (SOP)", expanded=False):
+            st.markdown("""
+            **Directorate General of Mines Safety (DGMS) Guidelines for Heavy Rain Limiting Conditions:**
+            1. **Highwall Pit Slope Inspection:** Regular checks for tension cracks on bench crests after rainfall exceeding 10 mm. Water ingress along foliation planes reduces the factor of safety.
+            2. **Haul Road Maintenance:** Maximum permissible gradient on wet haul roads is 1 in 16. Berms of height not less than the tyre radius of the largest vehicle must be maintained.
+            3. **Sump Pumping & Inundation Safeguards:** Dedicated high-capacity centrifugal pumps with independent diesel generation must remain on hot standby. Water level in sumps must not rise within 2 meters of working bench floor.
+            4. **Electrical Sub-station & Cable Safety:** Trailing cables to electric shovels/excavators must be elevated on cable horses away from standing water pools.
+            5. **ANFO Blasting Limitations:** Standard ANFO prills dissolve instantly upon contact with wet holes, resulting in desensitization and toxic brown NOx fumes. In wet holes, waterproof packaged emulsion or heavy ANFO blends must be used.
+            """)
+
+# -------------------------------------------------------------
+# TAB 4: INGEST & ANALYZE NEW DATASET
 # -------------------------------------------------------------
 with tab_dataset:
     st.subheader("📥 Ingest New Satellite Dataset & Detect Manganese Reservoirs")

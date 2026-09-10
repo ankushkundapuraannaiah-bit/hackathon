@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoManganese AI — Subterranean Mineral Detection & Climate GIS</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+        body { background: #0F172A; color: #F8FAFC; min-height: 100vh; display: flex; flex-direction: column; }
+        header { background: #1E293B; border-bottom: 1px solid #334155; padding: 16px 24px; }
+        .header-wrap { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .logo-title h1 { font-size: 1.4rem; font-weight: 800; color: #F8FAFC; display: flex; align-items: center; gap: 8px; }
+        .logo-title p { font-size: 0.82rem; color: #94A3B8; margin-top: 2px; }
+        .badge { background: #DC2626; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px; width: 100%; flex: 1; }
+
+        /* Weather Alert Banner */
+        .weather-banner {
+            background: linear-gradient(135deg, #450A0A 0%, #7F1D1D 100%);
+            border-left: 6px solid #DC2626;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .weather-banner.safe {
+            background: linear-gradient(135deg, #052E16 0%, #14532D 100%);
+            border-left-color: #16A34A;
+            box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
+        }
+        .weather-banner.warning {
+            background: linear-gradient(135deg, #431407 0%, #7C2D12 100%);
+            border-left-color: #EA580C;
+        }
+        .banner-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .banner-title { font-size: 1rem; font-weight: 700; color: #FEE2E2; display: flex; align-items: center; gap: 6px; }
+        .banner-meta { font-size: 0.85rem; color: #E2E8F0; font-weight: 600; }
+        .banner-desc { font-size: 0.86rem; color: #CBD5E1; line-height: 1.4; }
+        .banner-forecast { font-size: 0.8rem; color: #94A3B8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 6px; margin-top: 4px; }
+
+        /* KPIs */
+        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+        .kpi-card { background: #1E293B; border: 1px solid #334155; border-radius: 8px; padding: 14px 18px; }
+        .kpi-lbl { font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        .kpi-val { font-size: 1.5rem; font-weight: 800; color: #F8FAFC; margin: 4px 0; }
+        .kpi-sub { font-size: 0.78rem; color: #38BDF8; font-weight: 600; }
+
+        /* Map Section */
+        .map-section { background: #1E293B; border: 1px solid #334155; border-radius: 10px; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .map-header { padding: 14px 20px; background: #0F172A; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .map-header h2 { font-size: 1.05rem; font-weight: 700; color: #F8FAFC; }
+        .map-controls { display: flex; align-items: center; gap: 16px; font-size: 0.85rem; color: #94A3B8; }
+        .map-controls input[type="range"] { accent-color: #DC2626; cursor: pointer; }
+        #map { width: 100%; height: 600px; background: #020617; }
+
+        /* Selected Area Inspector */
+        .inspector-section { background: #1E293B; border: 1px solid #334155; border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+        .inspector-title { font-size: 1.1rem; font-weight: 700; color: #F8FAFC; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .inspector-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .coord-card { background: #0F172A; border: 1px solid #334155; border-radius: 6px; padding: 10px 14px; }
+        .coord-lbl { font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; font-weight: 600; }
+        .coord-val { font-size: 1rem; font-weight: 700; color: #38BDF8; font-family: monospace; margin-top: 2px; }
+
+        .enclosed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+        @media (max-width: 900px) { .enclosed-grid { grid-template-columns: 1fr; } }
+        .enclosed-card { background: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 14px; max-height: 280px; overflow-y: auto; }
+        .enclosed-card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: #F8FAFC; }
+        .mine-pill { background: #1E293B; border-left: 3px solid #DC2626; border-radius: 4px; padding: 8px 12px; margin-bottom: 6px; font-size: 0.82rem; }
+        .res-pill { background: #1E293B; border-left: 3px solid #F59E0B; border-radius: 4px; padding: 8px 12px; margin-bottom: 6px; font-size: 0.82rem; }
+
+        /* Standalone Heatmap */
+        .static-heatmap { background: #1E293B; border: 1px solid #334155; border-radius: 10px; padding: 20px; margin-bottom: 24px; text-align: center; }
+        .static-heatmap img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #334155; margin-top: 12px; }
+
+        footer { background: #0F172A; border-top: 1px solid #334155; padding: 20px 24px; text-align: center; font-size: 0.85rem; color: #64748B; }
+        a { color: #38BDF8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-wrap">
+        <div class="logo-title">
+            <h1>⚡ GeoManganese AI <span class="badge">LIVE GIS PLATFORM</span></h1>
+            <p>Subterranean Mineral Detection Using Space Technology & ML | PS ID: SIH26009 | Ministry of Steel</p>
+        </div>
+        <div>
+            <a href="https://github.com/ankushkundapuraannaiah-bit/hackathon" target="_blank" style="background:#334155; color:white; padding:8px 16px; border-radius:6px; font-size:0.85rem; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                ⭐ GitHub Repository
+            </a>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Live Weather Climatic Warning Banner -->
+    <div id="weatherBanner" class="weather-banner">
+        <div class="banner-top">
+            <div class="banner-title" id="bannerTitle">⏳ Fetching Real-Time Weather & Climatic Safety Data...</div>
+            <div class="banner-meta" id="bannerMeta">Open-Meteo API</div>
+        </div>
+        <div class="banner-desc" id="bannerDesc">Evaluating precipitation rates, convective storm activity, and DGMS mining limitation thresholds.</div>
+        <div class="banner-forecast" id="bannerForecast"></div>
+    </div>
+
+    <!-- Exploration KPIs -->
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-lbl">Exploration Grid</div>
+            <div class="kpi-val">324 km²</div>
+            <div class="kpi-sub">600 × 600 px @ 30m</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">Tree Canopy Filtered</div>
+            <div class="kpi-val" style="color:#10B981;">91.4%</div>
+            <div class="kpi-sub">NDVI > 0.40 Masked</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">AI Confidence Peak</div>
+            <div class="kpi-val" style="color:#F59E0B;">85.1%</div>
+            <div class="kpi-sub">Balanced Random Forest</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">Manganese Reservoirs</div>
+            <div class="kpi-val" style="color:#DC2626;">43</div>
+            <div class="kpi-sub">Delineated Subterranean Targets</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">MOIL Ground Truth</div>
+            <div class="kpi-val" style="color:#38BDF8;">100%</div>
+            <div class="kpi-sub">Bharweli Mine Spatial Match</div>
+        </div>
+    </div>
+
+    <!-- Map Section -->
+    <div class="map-section">
+        <div class="map-header">
+            <h2>🗺️ Interactive Web GIS Map — Balaghat & Bharweli Manganese Mining Belt</h2>
+            <div class="map-controls">
+                <span>🔥 Heatmap Opacity:</span>
+                <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="0.75" />
+                <span id="opacityVal">75%</span>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <!-- Selected Area & Mine Coordinates Inspector -->
+    <div class="inspector-section">
+        <div class="inspector-title">
+            📐 Selected Exploration Area & Mine Coordinates Inspector
+        </div>
+        <p style="font-size:0.85rem; color:#94A3B8; margin-bottom:14px;">
+            Click the <b>Rectangle</b> or <b>Polygon</b> icon on the map toolbar above to draw a box over any exploration target. 
+            The exact GPS coordinates, enclosed MOIL mines, and real-time pre-mining rain limitations will update immediately.
+        </p>
+
+        <div class="inspector-grid" id="coordsGrid">
+            <div class="coord-card">
+                <div class="coord-lbl">Centroid Coordinate</div>
+                <div class="coord-val" id="valCentroid">21.84989° N, 80.17987° E</div>
+            </div>
+            <div class="coord-card">
+                <div class="coord-lbl">North-West Corner</div>
+                <div class="coord-val" id="valNW">21.93076° N, 80.09232° E</div>
+            </div>
+            <div class="coord-card">
+                <div class="coord-lbl">South-East Corner</div>
+                <div class="coord-val" id="valSE">21.76901° N, 80.26743° E</div>
+            </div>
+            <div class="coord-card">
+                <div class="coord-lbl">Enclosed Footprint</div>
+                <div class="coord-val" id="valArea">324.00 km² (32,400 Ha)</div>
+            </div>
+        </div>
+
+        <div class="enclosed-grid">
+            <div class="enclosed-card">
+                <h4 id="minesTitle">⛏️ Enclosed MOIL Mines (12)</h4>
+                <div id="minesList"></div>
+            </div>
+            <div class="enclosed-card">
+                <h4 id="resTitle">💎 Enclosed Manganese Reservoirs (43)</h4>
+                <div id="resList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Static High-Res Heatmap Showcase -->
+    <div class="static-heatmap">
+        <h3 style="font-size:1.15rem; font-weight:700; color:#F8FAFC;">🔥 AI Subterranean Manganese Prospectivity Heatmap (Publication-Grade Model)</h3>
+        <p style="font-size:0.85rem; color:#94A3B8; margin-top:4px;">
+            Supervised Random Forest probability matrix across Band 4 (Red), Band 5 (NIR), Band 6 (SWIR1), and Band 7 (SWIR2) with hydrothermal alteration spectroscopy.
+        </p>
+        <img src="prospectivity_heatmap.png" alt="GeoManganese AI Prospectivity Heatmap" />
+    </div>
+
+</div>
+
+<footer>
+    <p>GeoManganese AI • Ministry of Steel • Domain: Smart Automation / Space Technology • PS ID: SIH26009</p>
+    <p style="margin-top:4px;">Built with Landsat-9 OLI-2, Sentinel-2, Open-Meteo API, Leaflet, and Scikit-Learn.</p>
+</footer>
+
+<!-- Leaflet JS & Draw Plugin -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+<script>
+    // 1. Data Injection
+    const minesData = [{"Name": "MOIL Bharweli Balaghat Mine", "Latitude": 21.8988, "Longitude": 80.2078, "Label": 1, "Category": "Active Manganese Mine", "Red": 0.1078, "NIR": 0.3044, "SWIR1": 0.3081, "SWIR2": 0.1962, "NDVI": 0.4769, "SWIR_Alteration": 1.5702, "Ferrous_Mn_Index": 1.0124, "Is_Bare_Ground": 0, "Inside_Crop": 1}, {"Name": "Bharweli North Extension Horizon", "Latitude": 21.915, "Longitude": 80.215, "Label": 1, "Category": "Manganese Prospect", "Red": 0.0346, "NIR": 0.2686, "SWIR1": 0.1469, "SWIR2": 0.0683, "NDVI": 0.7719, "SWIR_Alteration": 2.1517, "Ferrous_Mn_Index": 0.5468, "Is_Bare_Ground": 0, "Inside_Crop": 1}, {"Name": "Hirapur Manganese Occurrence", "Latitude": 21.875, "Longitude": 80.125, "Label": 1, "Category": "Manganese Float Ore", "Red": 0.1102, "NIR": 0.2547, "SWIR1": 0.2853, "SWIR2": 0.2172, "NDVI": 0.3961, "SWIR_Alteration": 1.3135, "Ferrous_Mn_Index": 1.1199, "Is_Bare_Ground": 1, "Inside_Crop": 1}, {"Name": "Sausar Manganiferous Ridge", "Latitude": 21.882, "Longitude": 80.195, "Label": 1, "Category": "Gondite Manganese Horizon", "Red": 0.1195, "NIR": 0.2533, "SWIR1": 0.27, "SWIR2": 0.1871, "NDVI": 0.3588, "SWIR_Alteration": 1.4433, "Ferrous_Mn_Index": 1.0661, "Is_Bare_Ground": 1, "Inside_Crop": 1}, {"Name": "MOIL Ramrama Mine", "Latitude": 21.85, "Longitude": 79.9167, "Label": 1, "Category": "Open Cast Manganese Mine", "Red": 0.0362, "NIR": 0.2519, "SWIR1": 0.1564, "SWIR2": 0.0733, "NDVI": 0.7487, "SWIR_Alteration": 2.1334, "Ferrous_Mn_Index": 0.6207, "Is_Bare_Ground": 0, "Inside_Crop": 0}, {"Name": "MOIL Miragpur Deposit", "Latitude": 21.78, "Longitude": 79.88, "Label": 1, "Category": "Manganese Prospect", "Red": 0.1045, "NIR": 0.2523, "SWIR1": 0.2936, "SWIR2": 0.2055, "NDVI": 0.4145, "SWIR_Alteration": 1.4285, "Ferrous_Mn_Index": 1.1635, "Is_Bare_Ground": 0, "Inside_Crop": 0}, {"Name": "MOIL Ukwa Mine", "Latitude": 21.9667, "Longitude": 80.4667, "Label": 1, "Category": "Underground Manganese Mine", "Red": 0.0941, "NIR": 0.2115, "SWIR1": 0.1767, "SWIR2": 0.1337, "NDVI": 0.3841, "SWIR_Alteration": 1.321, "Ferrous_Mn_Index": 0.8353, "Is_Bare_Ground": 1, "Inside_Crop": 0}, {"Name": "Bharweli Open Pit Working 1", "Latitude": 21.9015, "Longitude": 80.2092, "Label": 1, "Category": "Manganese Open Pit", "Red": 0.0835, "NIR": 0.2651, "SWIR1": 0.2091, "SWIR2": 0.1244, "NDVI": 0.5209, "SWIR_Alteration": 1.6811, "Ferrous_Mn_Index": 0.789, "Is_Bare_Ground": 0, "Inside_Crop": 1}, {"Name": "Bharweli Tailings & Ore Stacks", "Latitude": 21.895, "Longitude": 80.205, "Label": 1, "Category": "Manganese Ore Stockpile", "Red": 0.0762, "NIR": 0.2607, "SWIR1": 0.2042, "SWIR2": 0.1244, "NDVI": 0.5474, "SWIR_Alteration": 1.6417, "Ferrous_Mn_Index": 0.7833, "Is_Bare_Ground": 0, "Inside_Crop": 1}, {"Name": "Bharweli North Gondite Outcrop", "Latitude": 21.912, "Longitude": 80.218, "Label": 1, "Category": "Manganese Outcrop", "Red": 0.0403, "NIR": 0.2515, "SWIR1": 0.1504, "SWIR2": 0.0715, "NDVI": 0.7237, "SWIR_Alteration": 2.1053, "Ferrous_Mn_Index": 0.5981, "Is_Bare_Ground": 0, "Inside_Crop": 1}, {"Name": "Manegaon Manganese Prospect", "Latitude": 21.885, "Longitude": 80.225, "Label": 1, "Category": "Manganese Prospect", "Red": 0.0301, "NIR": 0.2595, "SWIR1": 0.1271, "SWIR2": 0.0552, "NDVI": 0.7918, "SWIR_Alteration": 2.3006, "Ferrous_Mn_Index": 0.4896, "Is_Bare_Ground": 0, "Inside_Crop": 1}, {"Name": "Laugur-Ukwa Manganese Trend", "Latitude": 21.928, "Longitude": 80.245, "Label": 1, "Category": "Manganiferous Schist", "Red": 0.0258, "NIR": 0.2205, "SWIR1": 0.1226, "SWIR2": 0.0551, "NDVI": 0.7907, "SWIR_Alteration": 2.2243, "Ferrous_Mn_Index": 0.5559, "Is_Bare_Ground": 0, "Inside_Crop": 1}];
+    const reservoirsData = [{"reservoir_id": "MN-RES-01", "name": "Manganese Reservoir 01 (Tier 1)", "latitude": 21.8436, "longitude": 80.15719, "peak_probability": 0.8121, "mean_probability": 0.7127, "confidence_percent": 81.2, "area_hectares": 0.63, "area_km2": 0.0063, "approx_radius_meters": 44.8, "pixel_count": 7, "swir_alteration_ratio": 1.395, "ndvi": 0.383, "spectral_reflectance": {"Red": 0.1138, "NIR": 0.2547, "SWIR1": 0.2828, "SWIR2": 0.2029}, "bounds": {"min_lat": 21.84302, "max_lat": 21.8441, "min_lon": 80.15702, "max_lon": 80.15732}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 1}, {"reservoir_id": "MN-RES-02", "name": "Manganese Reservoir 02 (Tier 1)", "latitude": 21.89122, "longitude": 80.13642, "peak_probability": 0.8121, "mean_probability": 0.7104, "confidence_percent": 81.2, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.447, "ndvi": 0.392, "spectral_reflectance": {"Red": 0.1125, "NIR": 0.2574, "SWIR1": 0.2849, "SWIR2": 0.1968}, "bounds": {"min_lat": 21.89116, "max_lat": 21.89142, "min_lon": 80.13613, "max_lon": 80.13671}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 2}, {"reservoir_id": "MN-RES-03", "name": "Manganese Reservoir 03 (Tier 1)", "latitude": 21.86254, "longitude": 80.15511, "peak_probability": 0.7987, "mean_probability": 0.6938, "confidence_percent": 79.9, "area_hectares": 1.35, "area_km2": 0.0135, "approx_radius_meters": 65.6, "pixel_count": 15, "swir_alteration_ratio": 1.426, "ndvi": 0.386, "spectral_reflectance": {"Red": 0.1152, "NIR": 0.26, "SWIR1": 0.2965, "SWIR2": 0.2081}, "bounds": {"min_lat": 21.86198, "max_lat": 21.86306, "min_lon": 80.1543, "max_lon": 80.15576}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 3}, {"reservoir_id": "MN-RES-04", "name": "Manganese Reservoir 04 (Tier 1)", "latitude": 21.8789, "longitude": 80.13831, "peak_probability": 0.7963, "mean_probability": 0.7171, "confidence_percent": 79.6, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.4, "ndvi": 0.373, "spectral_reflectance": {"Red": 0.116, "NIR": 0.2543, "SWIR1": 0.2928, "SWIR2": 0.2093}, "bounds": {"min_lat": 21.8787, "max_lat": 21.87924, "min_lon": 80.13823, "max_lon": 80.13853}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 4}, {"reservoir_id": "MN-RES-05", "name": "Manganese Reservoir 05 (Tier 1)", "latitude": 21.8474, "longitude": 80.13502, "peak_probability": 0.7912, "mean_probability": 0.7248, "confidence_percent": 79.1, "area_hectares": 0.63, "area_km2": 0.0063, "approx_radius_meters": 44.8, "pixel_count": 7, "swir_alteration_ratio": 1.343, "ndvi": 0.371, "spectral_reflectance": {"Red": 0.1168, "NIR": 0.2545, "SWIR1": 0.2838, "SWIR2": 0.2114}, "bounds": {"min_lat": 21.84724, "max_lat": 21.84751, "min_lon": 80.13465, "max_lon": 80.13552}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 5}, {"reservoir_id": "MN-RES-06", "name": "Manganese Reservoir 06 (Tier 1)", "latitude": 21.89317, "longitude": 80.13321, "peak_probability": 0.7854, "mean_probability": 0.7249, "confidence_percent": 78.5, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.419, "ndvi": 0.38, "spectral_reflectance": {"Red": 0.1127, "NIR": 0.2508, "SWIR1": 0.2803, "SWIR2": 0.1975}, "bounds": {"min_lat": 21.89276, "max_lat": 21.89358, "min_lon": 80.13321, "max_lon": 80.13321}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 6}, {"reservoir_id": "MN-RES-07", "name": "Manganese Reservoir 07 (Tier 1)", "latitude": 21.84594, "longitude": 80.22268, "peak_probability": 0.783, "mean_probability": 0.704, "confidence_percent": 78.3, "area_hectares": 0.45, "area_km2": 0.0045, "approx_radius_meters": 37.8, "pixel_count": 5, "swir_alteration_ratio": 1.422, "ndvi": 0.374, "spectral_reflectance": {"Red": 0.1147, "NIR": 0.2518, "SWIR1": 0.2915, "SWIR2": 0.205}, "bounds": {"min_lat": 21.84578, "max_lat": 21.84605, "min_lon": 80.22233, "max_lon": 80.22291}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 7}, {"reservoir_id": "MN-RES-08", "name": "Manganese Reservoir 08 (Tier 1)", "latitude": 21.8346, "longitude": 80.23749, "peak_probability": 0.7812, "mean_probability": 0.7001, "confidence_percent": 78.1, "area_hectares": 0.72, "area_km2": 0.0072, "approx_radius_meters": 47.9, "pixel_count": 8, "swir_alteration_ratio": 1.376, "ndvi": 0.38, "spectral_reflectance": {"Red": 0.1139, "NIR": 0.2535, "SWIR1": 0.2878, "SWIR2": 0.2091}, "bounds": {"min_lat": 21.8342, "max_lat": 21.83501, "min_lon": 80.23719, "max_lon": 80.23778}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 8}, {"reservoir_id": "MN-RES-09", "name": "Manganese Reservoir 09 (Tier 1)", "latitude": 21.86229, "longitude": 80.15359, "peak_probability": 0.7761, "mean_probability": 0.6961, "confidence_percent": 77.6, "area_hectares": 0.99, "area_km2": 0.0099, "approx_radius_meters": 56.1, "pixel_count": 11, "swir_alteration_ratio": 1.377, "ndvi": 0.362, "spectral_reflectance": {"Red": 0.1197, "NIR": 0.2553, "SWIR1": 0.2939, "SWIR2": 0.2136}, "bounds": {"min_lat": 21.8617, "max_lat": 21.86332, "min_lon": 80.15284, "max_lon": 80.15402}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 9}, {"reservoir_id": "MN-RES-10", "name": "Manganese Reservoir 10 (Tier 1)", "latitude": 21.89054, "longitude": 80.13796, "peak_probability": 0.7699, "mean_probability": 0.7198, "confidence_percent": 77.0, "area_hectares": 0.63, "area_km2": 0.0063, "approx_radius_meters": 44.8, "pixel_count": 7, "swir_alteration_ratio": 1.414, "ndvi": 0.383, "spectral_reflectance": {"Red": 0.1134, "NIR": 0.254, "SWIR1": 0.2878, "SWIR2": 0.2036}, "bounds": {"min_lat": 21.89035, "max_lat": 21.89089, "min_lon": 80.13758, "max_lon": 80.13846}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 10}, {"reservoir_id": "MN-RES-11", "name": "Manganese Reservoir 11 (Tier 1)", "latitude": 21.89681, "longitude": 80.13788, "peak_probability": 0.7684, "mean_probability": 0.686, "confidence_percent": 76.8, "area_hectares": 0.54, "area_km2": 0.0054, "approx_radius_meters": 41.5, "pixel_count": 6, "swir_alteration_ratio": 1.423, "ndvi": 0.341, "spectral_reflectance": {"Red": 0.1256, "NIR": 0.2555, "SWIR1": 0.3015, "SWIR2": 0.2119}, "bounds": {"min_lat": 21.89658, "max_lat": 21.89712, "min_lon": 80.13754, "max_lon": 80.13813}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 11}, {"reservoir_id": "MN-RES-12", "name": "Manganese Reservoir 12 (Tier 1)", "latitude": 21.84159, "longitude": 80.16033, "peak_probability": 0.7684, "mean_probability": 0.7109, "confidence_percent": 76.8, "area_hectares": 0.54, "area_km2": 0.0054, "approx_radius_meters": 41.5, "pixel_count": 6, "swir_alteration_ratio": 1.418, "ndvi": 0.38, "spectral_reflectance": {"Red": 0.1139, "NIR": 0.2531, "SWIR1": 0.2828, "SWIR2": 0.1994}, "bounds": {"min_lat": 21.84141, "max_lat": 21.84195, "min_lon": 80.15994, "max_lon": 80.16052}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 12}, {"reservoir_id": "MN-RES-13", "name": "Manganese Reservoir 13 (Tier 1)", "latitude": 21.8941, "longitude": 80.12979, "peak_probability": 0.7684, "mean_probability": 0.7027, "confidence_percent": 76.8, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.426, "ndvi": 0.382, "spectral_reflectance": {"Red": 0.1155, "NIR": 0.2581, "SWIR1": 0.2846, "SWIR2": 0.1996}, "bounds": {"min_lat": 21.89383, "max_lat": 21.89437, "min_lon": 80.12972, "max_lon": 80.13001}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 13}, {"reservoir_id": "MN-RES-14", "name": "Manganese Reservoir 14 (Tier 1)", "latitude": 21.8529, "longitude": 80.15421, "peak_probability": 0.7621, "mean_probability": 0.7098, "confidence_percent": 76.2, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.409, "ndvi": 0.389, "spectral_reflectance": {"Red": 0.111, "NIR": 0.2524, "SWIR1": 0.2854, "SWIR2": 0.2026}, "bounds": {"min_lat": 21.85276, "max_lat": 21.85303, "min_lon": 80.15407, "max_lon": 80.15436}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 14}, {"reservoir_id": "MN-RES-15", "name": "Manganese Reservoir 15 (Tier 1)", "latitude": 21.84844, "longitude": 80.14335, "peak_probability": 0.7567, "mean_probability": 0.722, "confidence_percent": 75.7, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.395, "ndvi": 0.364, "spectral_reflectance": {"Red": 0.1217, "NIR": 0.261, "SWIR1": 0.2901, "SWIR2": 0.2081}, "bounds": {"min_lat": 21.84837, "max_lat": 21.84864, "min_lon": 80.14306, "max_lon": 80.14364}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 15}, {"reservoir_id": "MN-RES-16", "name": "Manganese Reservoir 16 (Tier 1)", "latitude": 21.88249, "longitude": 80.1915, "peak_probability": 0.7536, "mean_probability": 0.7251, "confidence_percent": 75.4, "area_hectares": 0.54, "area_km2": 0.0054, "approx_radius_meters": 41.5, "pixel_count": 6, "swir_alteration_ratio": 1.379, "ndvi": 0.362, "spectral_reflectance": {"Red": 0.1183, "NIR": 0.2525, "SWIR1": 0.2821, "SWIR2": 0.2046}, "bounds": {"min_lat": 21.88222, "max_lat": 21.88276, "min_lon": 80.19135, "max_lon": 80.19164}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 16}, {"reservoir_id": "MN-RES-17", "name": "Manganese Reservoir 17 (Tier 1)", "latitude": 21.83578, "longitude": 80.16557, "peak_probability": 0.7511, "mean_probability": 0.7, "confidence_percent": 75.1, "area_hectares": 0.63, "area_km2": 0.0063, "approx_radius_meters": 44.8, "pixel_count": 7, "swir_alteration_ratio": 1.443, "ndvi": 0.38, "spectral_reflectance": {"Red": 0.1184, "NIR": 0.2637, "SWIR1": 0.3012, "SWIR2": 0.2088}, "bounds": {"min_lat": 21.83548, "max_lat": 21.83601, "min_lon": 80.1652, "max_lon": 80.16578}, "tier": "Tier 1: High-Confidence Primary Manganese Ore Body", "recommendation": "Priority 1 Core Drilling Target (MOIL / Geological Survey)", "marker_color": "#991B1B", "rank": 17}, {"reservoir_id": "MN-RES-18", "name": "Manganese Reservoir 18 (Tier 2)", "latitude": 21.83304, "longitude": 80.24064, "peak_probability": 0.7465, "mean_probability": 0.6915, "confidence_percent": 74.7, "area_hectares": 0.54, "area_km2": 0.0054, "approx_radius_meters": 41.5, "pixel_count": 6, "swir_alteration_ratio": 1.413, "ndvi": 0.384, "spectral_reflectance": {"Red": 0.1143, "NIR": 0.2568, "SWIR1": 0.2852, "SWIR2": 0.2019}, "bounds": {"min_lat": 21.83258, "max_lat": 21.83367, "min_lon": 80.24039, "max_lon": 80.24069}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 18}, {"reservoir_id": "MN-RES-19", "name": "Manganese Reservoir 19 (Tier 2)", "latitude": 21.95368, "longitude": 80.14635, "peak_probability": 0.7452, "mean_probability": 0.6931, "confidence_percent": 74.5, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.339, "ndvi": 0.395, "spectral_reflectance": {"Red": 0.1102, "NIR": 0.2544, "SWIR1": 0.2871, "SWIR2": 0.2144}, "bounds": {"min_lat": 21.95354, "max_lat": 21.95381, "min_lon": 80.14621, "max_lon": 80.1465}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 19}, {"reservoir_id": "MN-RES-20", "name": "Manganese Reservoir 20 (Tier 2)", "latitude": 21.84711, "longitude": 80.13621, "peak_probability": 0.7451, "mean_probability": 0.7037, "confidence_percent": 74.5, "area_hectares": 0.72, "area_km2": 0.0072, "approx_radius_meters": 47.9, "pixel_count": 8, "swir_alteration_ratio": 1.373, "ndvi": 0.366, "spectral_reflectance": {"Red": 0.12, "NIR": 0.2583, "SWIR1": 0.2855, "SWIR2": 0.2083}, "bounds": {"min_lat": 21.84671, "max_lat": 21.84779, "min_lon": 80.13581, "max_lon": 80.13639}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 20}, {"reservoir_id": "MN-RES-21", "name": "Manganese Reservoir 21 (Tier 2)", "latitude": 21.88068, "longitude": 80.13846, "peak_probability": 0.7413, "mean_probability": 0.708, "confidence_percent": 74.1, "area_hectares": 0.9, "area_km2": 0.009, "approx_radius_meters": 53.5, "pixel_count": 10, "swir_alteration_ratio": 1.403, "ndvi": 0.378, "spectral_reflectance": {"Red": 0.1157, "NIR": 0.2561, "SWIR1": 0.2869, "SWIR2": 0.2045}, "bounds": {"min_lat": 21.88005, "max_lat": 21.88114, "min_lon": 80.13822, "max_lon": 80.13881}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 21}, {"reservoir_id": "MN-RES-22", "name": "Manganese Reservoir 22 (Tier 2)", "latitude": 21.88007, "longitude": 80.19549, "peak_probability": 0.7401, "mean_probability": 0.7209, "confidence_percent": 74.0, "area_hectares": 0.45, "area_km2": 0.0045, "approx_radius_meters": 37.8, "pixel_count": 5, "swir_alteration_ratio": 1.425, "ndvi": 0.378, "spectral_reflectance": {"Red": 0.1166, "NIR": 0.2586, "SWIR1": 0.2849, "SWIR2": 0.1999}, "bounds": {"min_lat": 21.8798, "max_lat": 21.88034, "min_lon": 80.19514, "max_lon": 80.19572}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 22}, {"reservoir_id": "MN-RES-23", "name": "Manganese Reservoir 23 (Tier 2)", "latitude": 21.86123, "longitude": 80.15453, "peak_probability": 0.7373, "mean_probability": 0.6934, "confidence_percent": 73.7, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.385, "ndvi": 0.366, "spectral_reflectance": {"Red": 0.1194, "NIR": 0.257, "SWIR1": 0.2888, "SWIR2": 0.2085}, "bounds": {"min_lat": 21.86117, "max_lat": 21.86143, "min_lon": 80.15431, "max_lon": 80.15489}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 23}, {"reservoir_id": "MN-RES-24", "name": "Manganese Reservoir 24 (Tier 2)", "latitude": 21.8976, "longitude": 80.13903, "peak_probability": 0.7318, "mean_probability": 0.6974, "confidence_percent": 73.2, "area_hectares": 0.72, "area_km2": 0.0072, "approx_radius_meters": 47.9, "pixel_count": 8, "swir_alteration_ratio": 1.465, "ndvi": 0.377, "spectral_reflectance": {"Red": 0.1161, "NIR": 0.2565, "SWIR1": 0.2901, "SWIR2": 0.198}, "bounds": {"min_lat": 21.89713, "max_lat": 21.89794, "min_lon": 80.13841, "max_lon": 80.13958}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 24}, {"reservoir_id": "MN-RES-25", "name": "Manganese Reservoir 25 (Tier 2)", "latitude": 21.85291, "longitude": 80.24131, "peak_probability": 0.731, "mean_probability": 0.6825, "confidence_percent": 73.1, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.438, "ndvi": 0.358, "spectral_reflectance": {"Red": 0.121, "NIR": 0.256, "SWIR1": 0.3139, "SWIR2": 0.2183}, "bounds": {"min_lat": 21.85264, "max_lat": 21.85318, "min_lon": 80.24116, "max_lon": 80.24145}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 25}, {"reservoir_id": "MN-RES-26", "name": "Manganese Reservoir 26 (Tier 2)", "latitude": 21.89684, "longitude": 80.13621, "peak_probability": 0.7303, "mean_probability": 0.6988, "confidence_percent": 73.0, "area_hectares": 0.45, "area_km2": 0.0045, "approx_radius_meters": 37.8, "pixel_count": 5, "swir_alteration_ratio": 1.44, "ndvi": 0.371, "spectral_reflectance": {"Red": 0.1185, "NIR": 0.2584, "SWIR1": 0.2916, "SWIR2": 0.2024}, "bounds": {"min_lat": 21.89657, "max_lat": 21.89711, "min_lon": 80.1358, "max_lon": 80.13639}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 26}, {"reservoir_id": "MN-RES-27", "name": "Manganese Reservoir 27 (Tier 2)", "latitude": 21.85877, "longitude": 80.21892, "peak_probability": 0.7301, "mean_probability": 0.6907, "confidence_percent": 73.0, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.353, "ndvi": 0.379, "spectral_reflectance": {"Red": 0.1179, "NIR": 0.2615, "SWIR1": 0.2842, "SWIR2": 0.2101}, "bounds": {"min_lat": 21.8585, "max_lat": 21.85904, "min_lon": 80.21877, "max_lon": 80.21907}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 27}, {"reservoir_id": "MN-RES-28", "name": "Manganese Reservoir 28 (Tier 2)", "latitude": 21.88123, "longitude": 80.14366, "peak_probability": 0.7284, "mean_probability": 0.7183, "confidence_percent": 72.8, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.401, "ndvi": 0.383, "spectral_reflectance": {"Red": 0.1169, "NIR": 0.2621, "SWIR1": 0.2913, "SWIR2": 0.2078}, "bounds": {"min_lat": 21.88117, "max_lat": 21.88143, "min_lon": 80.14345, "max_lon": 80.14403}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 28}, {"reservoir_id": "MN-RES-29", "name": "Manganese Reservoir 29 (Tier 2)", "latitude": 21.88797, "longitude": 80.18922, "peak_probability": 0.7263, "mean_probability": 0.7056, "confidence_percent": 72.6, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.431, "ndvi": 0.374, "spectral_reflectance": {"Red": 0.1165, "NIR": 0.2556, "SWIR1": 0.2875, "SWIR2": 0.2009}, "bounds": {"min_lat": 21.88763, "max_lat": 21.88817, "min_lon": 80.189, "max_lon": 80.18929}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 29}, {"reservoir_id": "MN-RES-30", "name": "Manganese Reservoir 30 (Tier 2)", "latitude": 21.85577, "longitude": 80.14842, "peak_probability": 0.7259, "mean_probability": 0.6876, "confidence_percent": 72.6, "area_hectares": 0.45, "area_km2": 0.0045, "approx_radius_meters": 37.8, "pixel_count": 5, "swir_alteration_ratio": 1.394, "ndvi": 0.376, "spectral_reflectance": {"Red": 0.1192, "NIR": 0.263, "SWIR1": 0.2997, "SWIR2": 0.2151}, "bounds": {"min_lat": 21.85544, "max_lat": 21.85598, "min_lon": 80.14824, "max_lon": 80.14854}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 30}, {"reservoir_id": "MN-RES-31", "name": "Manganese Reservoir 31 (Tier 2)", "latitude": 21.86424, "longitude": 80.14674, "peak_probability": 0.7257, "mean_probability": 0.7169, "confidence_percent": 72.6, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.388, "ndvi": 0.38, "spectral_reflectance": {"Red": 0.1141, "NIR": 0.2538, "SWIR1": 0.2891, "SWIR2": 0.2086}, "bounds": {"min_lat": 21.86411, "max_lat": 21.86438, "min_lon": 80.14645, "max_lon": 80.14703}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 31}, {"reservoir_id": "MN-RES-32", "name": "Manganese Reservoir 32 (Tier 2)", "latitude": 21.8944, "longitude": 80.13567, "peak_probability": 0.7243, "mean_probability": 0.6909, "confidence_percent": 72.4, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.434, "ndvi": 0.381, "spectral_reflectance": {"Red": 0.1181, "NIR": 0.2638, "SWIR1": 0.2839, "SWIR2": 0.198}, "bounds": {"min_lat": 21.89413, "max_lat": 21.89467, "min_lon": 80.13553, "max_lon": 80.13582}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 32}, {"reservoir_id": "MN-RES-33", "name": "Manganese Reservoir 33 (Tier 2)", "latitude": 21.82652, "longitude": 80.24367, "peak_probability": 0.7234, "mean_probability": 0.7044, "confidence_percent": 72.3, "area_hectares": 0.63, "area_km2": 0.0063, "approx_radius_meters": 44.8, "pixel_count": 7, "swir_alteration_ratio": 1.363, "ndvi": 0.377, "spectral_reflectance": {"Red": 0.1187, "NIR": 0.2623, "SWIR1": 0.293, "SWIR2": 0.2151}, "bounds": {"min_lat": 21.82609, "max_lat": 21.82691, "min_lon": 80.24333, "max_lon": 80.24392}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 33}, {"reservoir_id": "MN-RES-34", "name": "Manganese Reservoir 34 (Tier 2)", "latitude": 21.86447, "longitude": 80.15516, "peak_probability": 0.7227, "mean_probability": 0.6972, "confidence_percent": 72.3, "area_hectares": 0.45, "area_km2": 0.0045, "approx_radius_meters": 37.8, "pixel_count": 5, "swir_alteration_ratio": 1.365, "ndvi": 0.365, "spectral_reflectance": {"Red": 0.119, "NIR": 0.2558, "SWIR1": 0.2849, "SWIR2": 0.209}, "bounds": {"min_lat": 21.86415, "max_lat": 21.86469, "min_lon": 80.15487, "max_lon": 80.15545}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 34}, {"reservoir_id": "MN-RES-35", "name": "Manganese Reservoir 35 (Tier 2)", "latitude": 21.87323, "longitude": 80.1297, "peak_probability": 0.7151, "mean_probability": 0.695, "confidence_percent": 71.5, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.403, "ndvi": 0.373, "spectral_reflectance": {"Red": 0.1217, "NIR": 0.2667, "SWIR1": 0.2991, "SWIR2": 0.2132}, "bounds": {"min_lat": 21.87323, "max_lat": 21.87323, "min_lon": 80.12927, "max_lon": 80.13014}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 35}, {"reservoir_id": "MN-RES-36", "name": "Manganese Reservoir 36 (Tier 2)", "latitude": 21.86172, "longitude": 80.14335, "peak_probability": 0.7127, "mean_probability": 0.6859, "confidence_percent": 71.3, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.356, "ndvi": 0.374, "spectral_reflectance": {"Red": 0.1173, "NIR": 0.2573, "SWIR1": 0.2848, "SWIR2": 0.2101}, "bounds": {"min_lat": 21.86165, "max_lat": 21.86192, "min_lon": 80.14298, "max_lon": 80.14356}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 36}, {"reservoir_id": "MN-RES-37", "name": "Manganese Reservoir 37 (Tier 2)", "latitude": 21.93107, "longitude": 80.13843, "peak_probability": 0.7062, "mean_probability": 0.67, "confidence_percent": 70.6, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.433, "ndvi": 0.375, "spectral_reflectance": {"Red": 0.1159, "NIR": 0.2549, "SWIR1": 0.3143, "SWIR2": 0.2193}, "bounds": {"min_lat": 21.93073, "max_lat": 21.93127, "min_lon": 80.13821, "max_lon": 80.1385}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 37}, {"reservoir_id": "MN-RES-38", "name": "Manganese Reservoir 38 (Tier 2)", "latitude": 21.88203, "longitude": 80.19426, "peak_probability": 0.7017, "mean_probability": 0.684, "confidence_percent": 70.2, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.38, "ndvi": 0.347, "spectral_reflectance": {"Red": 0.1271, "NIR": 0.2622, "SWIR1": 0.2954, "SWIR2": 0.2142}, "bounds": {"min_lat": 21.88196, "max_lat": 21.88223, "min_lon": 80.19397, "max_lon": 80.19455}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 38}, {"reservoir_id": "MN-RES-39", "name": "Manganese Reservoir 39 (Tier 2)", "latitude": 21.89275, "longitude": 80.18299, "peak_probability": 0.7, "mean_probability": 0.6793, "confidence_percent": 70.0, "area_hectares": 0.45, "area_km2": 0.0045, "approx_radius_meters": 37.8, "pixel_count": 5, "swir_alteration_ratio": 1.461, "ndvi": 0.365, "spectral_reflectance": {"Red": 0.1181, "NIR": 0.2541, "SWIR1": 0.3207, "SWIR2": 0.2196}, "bounds": {"min_lat": 21.89248, "max_lat": 21.89302, "min_lon": 80.18258, "max_lon": 80.18316}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 39}, {"reservoir_id": "MN-RES-40", "name": "Manganese Reservoir 40 (Tier 2)", "latitude": 21.86184, "longitude": 80.12716, "peak_probability": 0.6997, "mean_probability": 0.685, "confidence_percent": 70.0, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.359, "ndvi": 0.372, "spectral_reflectance": {"Red": 0.117, "NIR": 0.2557, "SWIR1": 0.3006, "SWIR2": 0.2212}, "bounds": {"min_lat": 21.86157, "max_lat": 21.86211, "min_lon": 80.12701, "max_lon": 80.12731}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 40}, {"reservoir_id": "MN-RES-41", "name": "Manganese Reservoir 41 (Tier 2)", "latitude": 21.87924, "longitude": 80.13916, "peak_probability": 0.6994, "mean_probability": 0.6843, "confidence_percent": 69.9, "area_hectares": 0.45, "area_km2": 0.0045, "approx_radius_meters": 37.8, "pixel_count": 5, "swir_alteration_ratio": 1.392, "ndvi": 0.37, "spectral_reflectance": {"Red": 0.1213, "NIR": 0.2641, "SWIR1": 0.2964, "SWIR2": 0.2129}, "bounds": {"min_lat": 21.87897, "max_lat": 21.87951, "min_lon": 80.13881, "max_lon": 80.13939}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 41}, {"reservoir_id": "MN-RES-42", "name": "Manganese Reservoir 42 (Tier 2)", "latitude": 21.85373, "longitude": 80.2413, "peak_probability": 0.681, "mean_probability": 0.6735, "confidence_percent": 68.1, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.462, "ndvi": 0.382, "spectral_reflectance": {"Red": 0.1176, "NIR": 0.2629, "SWIR1": 0.3042, "SWIR2": 0.2082}, "bounds": {"min_lat": 21.85373, "max_lat": 21.85373, "min_lon": 80.24087, "max_lon": 80.24174}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 42}, {"reservoir_id": "MN-RES-43", "name": "Manganese Reservoir 43 (Tier 2)", "latitude": 21.94734, "longitude": 80.15242, "peak_probability": 0.6805, "mean_probability": 0.6653, "confidence_percent": 68.1, "area_hectares": 0.36, "area_km2": 0.0036, "approx_radius_meters": 33.9, "pixel_count": 4, "swir_alteration_ratio": 1.466, "ndvi": 0.382, "spectral_reflectance": {"Red": 0.1157, "NIR": 0.2588, "SWIR1": 0.3038, "SWIR2": 0.2073}, "bounds": {"min_lat": 21.94707, "max_lat": 21.94761, "min_lon": 80.15235, "max_lon": 80.15264}, "tier": "Tier 2: Prospective Hydrothermal Alteration Halo", "recommendation": "Detailed Surface Trenching & Geophysical Profiling", "marker_color": "#C2410C", "rank": 43}];
+    const bounds = [[21.76901414893615, 80.09231766315732], [21.930756132803804, 80.26742848466002]];
+    const centerLat = 21.84988514086998;
+    const centerLon = 80.17987307390867;
+
+    // 2. Initialize Leaflet Map
+    const map = L.map('map').setView([centerLat, centerLon], 12);
+
+    // Base Layers
+    const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    }).addTo(map);
+
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    });
+
+    L.control.layers({ 'Esri Satellite': esriSat, 'OpenStreetMap': osm }).addTo(map);
+
+    // High-Res Exploration Bounding Box
+    L.rectangle(bounds, { color: '#38BDF8', weight: 2, dashArray: '5, 5', fill: false }).addTo(map);
+
+    // Heatmap Overlay
+    const heatmapOverlay = L.imageOverlay('heatmap_overlay.png', bounds, {
+        opacity: 0.75,
+        interactive: false
+    }).addTo(map);
+
+    // Opacity Slider
+    const slider = document.getElementById('opacitySlider');
+    const valText = document.getElementById('opacityVal');
+    slider.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        heatmapOverlay.setOpacity(v);
+        valText.textContent = Math.round(v * 100) + '%';
+    });
+
+    // 3. Add MOIL Mines
+    minesData.forEach(m => {
+        const popup = `
+            <div style="font-family:sans-serif; width:220px; color:#1E293B;">
+                <h4 style="color:#DC2626; margin-bottom:4px;">⛏️ ${m.Name}</h4>
+                <div style="background:#FEE2E2; color:#B91C1C; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; display:inline-block; margin-bottom:6px;">
+                    ${m.Category}
+                </div>
+                <div style="font-size:12px; line-height:1.4;">
+                    <b>Latitude:</b> ${m.Latitude.toFixed(5)}° N<br/>
+                    <b>Longitude:</b> ${m.Longitude.toFixed(5)}° E<br/>
+                    <b>SWIR Alteration:</b> ${m.SWIR_Alteration ? m.SWIR_Alteration.toFixed(3) : 'N/A'}<br/>
+                    <b>Operator:</b> MOIL Ltd / Min of Steel
+                </div>
+            </div>
+        `;
+        L.circleMarker([m.Latitude, m.Longitude], {
+            radius: 7,
+            fillColor: '#DC2626',
+            color: '#FFFFFF',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+        }).bindPopup(popup).addTo(map);
+    });
+
+    // 4. Add AI Reservoirs
+    reservoirsData.forEach(r => {
+        const color = r.marker_color || '#DC2626';
+        const popup = `
+            <div style="font-family:sans-serif; width:250px; color:#1E293B;">
+                <h4 style="color:${color}; margin-bottom:4px;">💎 ${r.reservoir_id}</h4>
+                <div style="font-size:12px; line-height:1.4;">
+                    <b>AI Confidence:</b> <span style="color:${color}; font-weight:bold;">${r.confidence_percent.toFixed(1)}%</span><br/>
+                    <b>Area:</b> ${r.area_hectares.toFixed(2)} Ha (${r.area_km2.toFixed(4)} km²)<br/>
+                    <b>Latitude:</b> ${r.latitude.toFixed(5)}° N<br/>
+                    <b>Longitude:</b> ${r.longitude.toFixed(5)}° E<br/>
+                    <b>SWIR Ratio:</b> ${r.swir_alteration_ratio.toFixed(3)}<br/>
+                    <div style="background:#FEF3C7; padding:4px; border-radius:4px; margin-top:4px; font-size:11px;">
+                        ⚒️ ${r.recommendation}
+                    </div>
+                </div>
+            </div>
+        `;
+        L.circle([r.latitude, r.longitude], {
+            radius: Math.max(r.approx_radius_meters || 120, 100),
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.25,
+            weight: 2
+        }).bindPopup(popup).addTo(map);
+
+        L.circleMarker([r.latitude, r.longitude], {
+            radius: 4,
+            fillColor: color,
+            color: '#FFFFFF',
+            weight: 1.5,
+            fillOpacity: 1
+        }).bindPopup(popup).addTo(map);
+    });
+
+    // 5. Leaflet Draw Plugin for Area Selection
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    const drawControl = new L.Control.Draw({
+        position: 'topleft',
+        draw: {
+            polygon: true,
+            rectangle: true,
+            circle: false,
+            circlemarker: false,
+            marker: false,
+            polyline: false
+        },
+        edit: { featureGroup: drawnItems }
+    });
+    map.addControl(drawControl);
+
+    map.on(L.Draw.Event.CREATED, function (e) {
+        drawnItems.clearLayers();
+        const layer = e.layer;
+        drawnItems.addLayer(layer);
+
+        const latLngs = layer.getLatLngs()[0];
+        const lats = latLngs.map(p => p.lat);
+        const lngs = latLngs.map(p => p.lng);
+
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+
+        const cLat = (minLat + maxLat) / 2;
+        const cLng = (minLng + maxLng) / 2;
+
+        const latDistKm = Math.abs(maxLat - minLat) * 110.574;
+        const lonDistKm = Math.abs(maxLng - minLng) * 111.320 * Math.cos(cLat * Math.PI / 180);
+        const areaKm2 = latDistKm * lonDistKm;
+
+        updateInspector(minLat, maxLat, minLng, maxLng, cLat, cLng, areaKm2);
+        fetchWeather(cLat, cLng, `Selected Box (${cLat.toFixed(4)}° N, ${cLng.toFixed(4)}° E)`);
+    });
+
+    function updateInspector(minLat, maxLat, minLng, maxLng, cLat, cLng, areaKm2) {
+        document.getElementById('valCentroid').textContent = `${cLat.toFixed(5)}° N, ${cLng.toFixed(5)}° E`;
+        document.getElementById('valNW').textContent = `${maxLat.toFixed(5)}° N, ${minLng.toFixed(5)}° E`;
+        document.getElementById('valSE').textContent = `${minLat.toFixed(5)}° N, ${maxLng.toFixed(5)}° E`;
+        document.getElementById('valArea').textContent = `${areaKm2.toFixed(3)} km² (${(areaKm2 * 100).toFixed(1)} Ha)`;
+
+        // Filter Mines
+        const encMines = minesData.filter(m => m.Latitude >= minLat && m.Latitude <= maxLat && m.Longitude >= minLng && m.Longitude <= maxLng);
+        document.getElementById('minesTitle').textContent = `⛏️ Enclosed MOIL Mines (${encMines.length})`;
+        const mList = document.getElementById('minesList');
+        mList.innerHTML = encMines.length === 0 ? '<p style="color:#64748B; font-size:0.8rem;">No active MOIL mines inside drawn boundary.</p>' : '';
+        encMines.forEach(m => {
+            mList.innerHTML += `
+                <div class="mine-pill">
+                    <b>${m.Name}</b><br/>
+                    📍 ${m.Latitude.toFixed(5)}° N, ${m.Longitude.toFixed(5)}° E | 🏷️ ${m.Category}
+                </div>
+            `;
+        });
+
+        // Filter Reservoirs
+        const encRes = reservoirsData.filter(r => r.latitude >= minLat && r.latitude <= maxLat && r.longitude >= minLng && r.longitude <= maxLng);
+        document.getElementById('resTitle').textContent = `💎 Enclosed Manganese Reservoirs (${encRes.length})`;
+        const rList = document.getElementById('resList');
+        rList.innerHTML = encRes.length === 0 ? '<p style="color:#64748B; font-size:0.8rem;">No AI anomaly clusters inside drawn boundary.</p>' : '';
+        encRes.forEach(r => {
+            rList.innerHTML += `
+                <div class="res-pill">
+                    <b style="color:#F59E0B;">${r.reservoir_id}</b> (${r.confidence_percent.toFixed(1)}% AI Confidence)<br/>
+                    📍 ${r.latitude.toFixed(5)}° N, ${r.longitude.toFixed(5)}° E | 📐 ${r.area_hectares.toFixed(2)} Ha | ⚒️ ${r.tier.split(':')[0]}
+                </div>
+            `;
+        });
+    }
+
+    // Initial populate
+    updateInspector(21.76901414893615, 21.930756132803804, 80.09231766315732, 80.26742848466002, centerLat, centerLon, 324.0);
+
+    // 6. Live Weather API (Open-Meteo)
+    async function fetchWeather(lat, lon, locationLabel = 'Balaghat Mining Belt') {
+        try {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,wind_speed_10m&daily=weather_code,precipitation_sum,precipitation_probability_max&timezone=auto`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            const curr = data.current;
+            const daily = data.daily;
+
+            const rain = curr.rain || 0;
+            const precip = curr.precipitation || 0;
+            const temp = curr.temperature_2m;
+            const wind = curr.wind_speed_10m;
+            const wcode = curr.weather_code;
+
+            const precipTomorrow = (daily.precipitation_sum && daily.precipitation_sum[1]) || 0;
+            const probTomorrow = (daily.precipitation_probability_max && daily.precipitation_probability_max[1]) || 0;
+
+            const banner = document.getElementById('weatherBanner');
+            const bTitle = document.getElementById('bannerTitle');
+            const bMeta = document.getElementById('bannerMeta');
+            const bDesc = document.getElementById('bannerDesc');
+            const bForecast = document.getElementById('bannerForecast');
+
+            banner.className = 'weather-banner';
+
+            if (rain >= 2.0 || precip >= 2.0 || [65, 67, 82, 95, 96, 99].includes(wcode) || precipTomorrow >= 20.0 || (precipTomorrow >= 12.0 && probTomorrow >= 80)) {
+                banner.classList.add('critical');
+                bTitle.innerHTML = `⛔ CRITICAL CLIMATIC LIMITATION: HEAVY RAINFALL ALERT | 📍 ${locationLabel}`;
+                bDesc.innerHTML = `Severe weather limitation active. Forecast: <b>${precipTomorrow.toFixed(1)} mm rain tomorrow (${probTomorrow}% probability)</b>. Open-cast pit excavation, bench drilling, and heavy haulage suspended due to waterlogging, road slippage, and highwall landslide hazard.`;
+            } else if (rain > 0.1 || precip > 0.1 || precipTomorrow >= 6.0 || probTomorrow >= 65) {
+                banner.classList.add('warning');
+                bTitle.innerHTML = `⚠️ CLIMATIC LIMITATION: RAINFALL & SLICKNESS ADVISORY | 📍 ${locationLabel}`;
+                bDesc.innerHTML = `Moderate climatic limitation. Expected rainfall: <b>${precipTomorrow.toFixed(1)} mm (${probTomorrow}% chance)</b>. Haul dumpers restricted to 15 km/h; pit sump dewatering pumps on high alert; inspect slope tension cracks.`;
+            } else {
+                banner.classList.add('safe');
+                bTitle.innerHTML = `🟢 CLIMATIC CONDITIONS FAVORABLE FOR MINING | 📍 ${locationLabel}`;
+                bDesc.innerHTML = `Dry atmospheric conditions (Rain: 0.0 mm). All open-pit bench excavation, heavy dumper hauling, core drilling, and blast hole charging are clear to proceed.`;
+            }
+
+            bMeta.innerHTML = `🌡️ ${temp.toFixed(1)}°C &nbsp;•&nbsp; 💧 Rain: ${rain.toFixed(1)} mm/h &nbsp;•&nbsp; 💨 ${wind.toFixed(1)} km/h`;
+            bForecast.innerHTML = `🌧️ <b>48h Rain Forecast:</b> Today: <b>${(daily.precipitation_sum[0] || 0).toFixed(1)} mm</b> &nbsp;|&nbsp; Tomorrow: <b>${precipTomorrow.toFixed(1)} mm</b> (${probTomorrow}% chance)`;
+
+        } catch (err) {
+            console.error("Weather fetch failed:", err);
+            document.getElementById('bannerTitle').innerHTML = `⚠️ Meteorological Telemetry Standby | 📍 ${locationLabel}`;
+        }
+    }
+
+    // Initial weather fetch for Balaghat center
+    fetchWeather(centerLat, centerLon, 'Balaghat Exploration Center');
+</script>
+
+</body>
+</html>

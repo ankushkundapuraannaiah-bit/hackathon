@@ -131,5 +131,25 @@ Open your browser at `http://localhost:8501` to view:
 - **High-Resolution Exploration Grid:** 600 x 600 pixels (18 km x 18 km = 324 km^2)
 - **Tree Canopy Suppressed:** 91.4% of total scene area
 - **Identified High-Confidence Anomalies:** 1.76 km^2 (1,960 anomaly pixels)
-- **Peak Prospectivity Confidence:** 85.1%
 - **Ground Truth Match:** 100% spatial correlation with MOIL Bharweli underground workings.
+
+---
+
+## 🌐 Live Deployments & Cloud Access
+
+### 1. GitHub Pages (Live Web GIS Platform)
+- **Live URL:** [https://ankushkundapuraannaiah-bit.github.io/hackathon/](https://ankushkundapuraannaiah-bit.github.io/hackathon/)
+- **Features:** Interactive Leaflet GIS map with AI manganese prospectivity heatmap overlay, 43 delineated reservoirs, active MOIL mine markers, real-time Open-Meteo weather API with pre-mining rain warning, and interactive map box drawing tool for coordinate inspection.
+
+### 2. Streamlit Community Cloud (Full AI Dashboard)
+- **Deploy:** Deploy `app.py` directly to [share.streamlit.io](https://share.streamlit.io) from `ankushkundapuraannaiah-bit/hackathon` (`main` branch).
+- **Dashboard Tabs:**
+  - 🗺️ **Interactive Web GIS Map** with Draw tool for bounding box coordinate extraction
+  - 🔥 **AI Prospectivity Heatmap** with dynamic threshold slider & pixel distribution histogram
+  - 💎 **Manganese Reservoir Intelligence** with 43 delineated reserves & Tier 1/2/3 categorization
+  - 🌦️ **Climate & Mining Rain Safety** with live DGMS operational matrix & 7-day rainfall outlook
+  - 📥 **New Dataset Ingestion Studio** supporting preset belts, custom coordinates, and GeoTIFF upload
+  - 🔬 **Spectral Profiler & Anomaly Inspector**
+  - 💡 **Remote Sensing & Space Tech Defense**
+  - ⚙️ **Pipeline Automation Studio**
+
